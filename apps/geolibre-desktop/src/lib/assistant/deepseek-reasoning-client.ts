@@ -90,7 +90,7 @@ export class DeepSeekReasoningClient {
             const stream = await this.client.chat.completions.create(
               this.withReasoningContent(request) as never,
             );
-            return this.captureReasoningContent(stream as AsyncIterable<DeepSeekChunk>);
+            return this.captureReasoningContent(stream as unknown as AsyncIterable<DeepSeekChunk>);
           },
         },
       },

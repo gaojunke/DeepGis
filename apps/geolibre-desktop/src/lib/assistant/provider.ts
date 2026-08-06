@@ -539,13 +539,27 @@ export async function createModel(config: AssistantProviderConfig): Promise<Mode
         defaultHeaders: config.suppressAuthorizationHeader ? { Authorization: null } : undefined,
         dangerouslyAllowBrowser: true,
       };
+      if (isDeepSeekReasoner) {
+        const client = new DeepSeekReasoningClient({
+          apiKey: config.apiKey ?? "not-needed",
+          ...clientConfig,
+        }).asOpenAIClient();
+        // The workspace intentionally has separate OpenAI package versions for
+        // the desktop app and Strands. The wrapper exposes the same runtime
+        // client contract; `never` keeps that duplicate private type nominally
+        // isolated at this integration boundary.
+        return new OpenAIModel({
+          api: "chat",
+          apiKey: config.apiKey ?? "not-needed",
+          modelId: config.modelId,
+          client: client as never,
+        }) as unknown as Model;
+      }
       return new OpenAIModel({
         api: "chat",
         apiKey: config.apiKey ?? "not-needed",
         modelId: config.modelId,
-        ...(isDeepSeekReasoner
-          ? { client: new DeepSeekReasoningClient({ apiKey: config.apiKey ?? "not-needed", ...clientConfig }).asOpenAIClient() }
-          : { clientConfig }),
+        clientConfig,
       }) as unknown as Model;
     }
     case "bedrock": {
