@@ -84,11 +84,13 @@ describe("fetchLatestRelease", () => {
   it("normalizes a valid release and keeps a GitHub html_url", async () => {
     stubFetch(
       new Response(
-        JSON.stringify({
-          tag_name: "1.6.0",
-          body: "  notes  ",
-          html_url: "https://github.com/gaojunke/DeepGis/releases/tag/v1.6.0",
-        }),
+        JSON.stringify([
+          {
+            tag_name: "1.6.0",
+            body: "  notes  ",
+            html_url: "https://github.com/gaojunke/DeepGis/releases/tag/v1.6.0",
+          },
+        ]),
         { status: 200 },
       ),
     );
@@ -100,7 +102,7 @@ describe("fetchLatestRelease", () => {
 
   it("falls back to the downloads page for a non-GitHub html_url", async () => {
     stubFetch(
-      new Response(JSON.stringify({ tag_name: "v1.6.0", html_url: "http://evil.example" }), {
+      new Response(JSON.stringify([{ tag_name: "v1.6.0", html_url: "http://evil.example" }]), {
         status: 200,
       }),
     );
@@ -109,7 +111,7 @@ describe("fetchLatestRelease", () => {
   });
 
   it("falls back to the downloads page when html_url is absent", async () => {
-    stubFetch(new Response(JSON.stringify({ tag_name: "v1.6.0" }), { status: 200 }));
+    stubFetch(new Response(JSON.stringify([{ tag_name: "v1.6.0" }]), { status: 200 }));
     const release = await fetchLatestRelease();
     assert.equal(release.url, UPDATE_URL);
     assert.equal(release.notes, "");
@@ -148,7 +150,7 @@ describe("fetchLatestRelease", () => {
   });
 
   it("flags a missing version tag", async () => {
-    stubFetch(new Response(JSON.stringify({ body: "no tag" }), { status: 200 }));
+    stubFetch(new Response(JSON.stringify([{ body: "no tag" }]), { status: 200 }));
     await assert.rejects(fetchLatestRelease(), (error: unknown) => {
       assert.ok(error instanceof UpdateCheckError);
       assert.equal(error.code, "noTag");
@@ -156,18 +158,12 @@ describe("fetchLatestRelease", () => {
     });
   });
 
-  it("treats a repository with no release as an unconfigured update source", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async () => new Response(null, { status: 404 });
-    try {
-      await assert.rejects(fetchLatestRelease(), (error: unknown) => {
-        assert.ok(error instanceof UpdateCheckError);
-        assert.equal(error.code, "noTag");
-        assert.equal(error.status, 404);
-        return true;
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+  it("treats an empty releases list as an unconfigured update source", async () => {
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+    await assert.rejects(fetchLatestRelease(), (error: unknown) => {
+      assert.ok(error instanceof UpdateCheckError);
+      assert.equal(error.code, "noTag");
+      return true;
+    });
   });
 });

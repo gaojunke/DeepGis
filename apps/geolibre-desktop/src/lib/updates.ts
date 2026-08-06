@@ -8,8 +8,8 @@
 /** Page that lists the releases for this DeepGis build. */
 export const UPDATE_URL = "https://github.com/gaojunke/DeepGis/releases";
 
-/** GitHub REST endpoint for the latest published release. */
-export const LATEST_RELEASE_URL = "https://api.github.com/repos/gaojunke/DeepGis/releases/latest";
+/** GitHub REST endpoint for the newest published release, if one exists. */
+export const LATEST_RELEASE_URL = "https://api.github.com/repos/gaojunke/DeepGis/releases?per_page=1";
 
 /**
  * The running app version, injected by Vite at build time. Guarded so the pure
@@ -184,24 +184,21 @@ export async function fetchLatestRelease(signal?: AbortSignal): Promise<LatestRe
     ) {
       throw new UpdateCheckError("rateLimit", response.status);
     }
-    // A repository without a published release returns 404 from GitHub. This
-    // is the expected state for a freshly created DeepGis repository, not a
-    // network failure that should surface in Diagnostics.
-    if (response.status === 404) {
-      throw new UpdateCheckError("noTag", response.status);
-    }
     throw new UpdateCheckError("http", response.status);
   }
 
-  let release: GitHubRelease;
+  let releases: GitHubRelease[];
   try {
-    release = (await response.json()) as GitHubRelease;
+    const responseBody = (await response.json()) as unknown;
+    if (!Array.isArray(responseBody)) throw new Error("Expected a GitHub releases array");
+    releases = responseBody as GitHubRelease[];
   } catch {
     // A malformed 200 body would otherwise throw a plain SyntaxError that
     // bypasses UpdateCheckError; treat it like any other failed fetch.
     throw new UpdateCheckError("network");
   }
-  if (typeof release.tag_name !== "string" || !release.tag_name.trim()) {
+  const release = releases[0];
+  if (!release || typeof release.tag_name !== "string" || !release.tag_name.trim()) {
     throw new UpdateCheckError("noTag");
   }
 
